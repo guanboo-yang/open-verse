@@ -51,24 +51,46 @@ _MARKER = r"(?:[壹貳參肆伍陸柒捌玖拾]+|[一二三四五六七八九十
 HEADING_RE = re.compile(rf"^({_MARKER})[．.　 ](.+)$")
 
 
+CONT_RE = re.compile(r"[（(][^）)]*續[）)]|[─－]\s*續")  # （續） or ─續
+SUFFIX_RE = re.compile(r"[（(][^）)]*續[）)]$|[─－]\s*續$")  # trailing continuation tag
+DUP_MARKER_RE = re.compile(r"^([^　]{1,4})　(.+)$")
+# a range glued to the end without a full-width space, e.g. 「掌權（續）五十14～26」
+TRAIL_RANGE_RE = re.compile(
+    r"([零一二三四五六七八九十百]+\d+[上下]?(?:[，,]\d+[上下]?)*"
+    r"(?:[～~∼][零一二三四五六七八九十百]*\d+[上下]?)?)$"
+)
+
+
 def split_heading(text: str) -> tuple[str, str, str, bool]:
     """Return (marker, title, range, continued)."""
-    continued = False
+    continued = bool(CONT_RE.search(text))
+    # A parenthesised number marker 「（四）/（1）」 may be followed by the title with
+    # no separator.
+    pm = re.match(r"^(（[一二三四五六七八九十百\d]+）)[．.　 ]?(.+)$", text)
     m = HEADING_RE.match(text)
-    # A heading wrapped in full-width parens that isn't a 「（marker）…」 form is a
-    # parenthetical / continuation section: strip the wrapper and re-parse.
-    if m is None and text.startswith("（") and text.endswith("）"):
-        continued = "續" in text
+    if pm:
+        marker, rest = pm.group(1), pm.group(2)
+    elif m:
+        marker, rest = m.group(1), m.group(2)
+    elif text.startswith("（") and text.endswith("）"):
         text = text[1:-1]
         m = HEADING_RE.match(text)
-    if m:
-        marker, rest = m.group(1), m.group(2)
+        marker, rest = (m.group(1), m.group(2)) if m else ("", text)
     else:
         marker, rest = "", text
+    # some 續 lines repeat the marker ("2.2　活在…（續）"); drop the redundant one
+    dm = DUP_MARKER_RE.match(rest)
+    if dm and (dm.group(1) == marker or level_from_marker(dm.group(1))):
+        rest = dm.group(2)
     if FW in rest:
         title, _, rng = rest.rpartition(FW)
     else:
-        title, rng = rest, ""
+        tr = TRAIL_RANGE_RE.search(rest)
+        if tr:
+            title, rng = rest[: tr.start()], tr.group(1)
+        else:
+            title, rng = rest, ""
+    title = SUFFIX_RE.sub("", title).strip()
     return marker.strip(), normalize(title.strip()), rng.strip(), continued
 
 
@@ -77,6 +99,40 @@ def segment_from_range(rng: str) -> int:
     if m and m.group(3) == "下":
         return 1
     return 0
+
+
+def level_from_marker(marker: str) -> int | None:
+    if re.fullmatch(r"[壹貳參肆伍陸柒捌玖拾]+", marker):
+        return 1
+    if re.fullmatch(r"[一二三四五六七八九十百]+", marker):
+        return 2
+    if re.fullmatch(r"\d+", marker):
+        return 3
+    if re.fullmatch(r"[A-Za-z]", marker):
+        return 4
+    if re.fullmatch(r"（[一二三四五六七八九十]+）", marker):
+        return 5
+    if re.fullmatch(r"（\d+）", marker):
+        return 6
+    return None
+
+
+def parse_div(text: str, default_level: int) -> list[tuple[int, str, str, str, bool]]:
+    """Return [(level, marker, title, range, continued)]. A breadcrumb div with
+    several parenthesised groups (the ancestors continued at a chapter start,
+    e.g. 「（三.雅各的經歷）（1　受對付）（b　…─續）」) becomes one entry per group."""
+    # A continuation breadcrumb is several 「（…）」 groups joined by 「）（」 (a group
+    # may itself contain a nested （…） marker). A normal title that merely contains
+    # parens — （約瑟）, （續） — has no top-level 「）（」 boundary.
+    if text.startswith("（") and text.endswith("）") and "）（" in text:
+        out = []
+        for g in text[1:-1].split("）（"):
+            marker, title, rng, _ = split_heading(g)
+            lvl = level_from_marker(marker) or default_level
+            out.append((lvl, marker, title, rng, True))
+        return out
+    marker, title, rng, continued = split_heading(text)
+    return [(default_level, marker, title, rng, continued)]
 
 
 def parse_book_outline(html: str, book_no: int, chapter_count: int) -> list[dict]:
@@ -96,10 +152,10 @@ def parse_book_outline(html: str, book_no: int, chapter_count: int) -> list[dict
             text = el.get_text(strip=True)
             if not text:
                 continue
-            marker, title, rng, continued = split_heading(text)
-            events.append({"type": "outline", "level": int(mlvl.group(1)) + 1,
-                           "marker": marker, "title": title, "range": rng,
-                           "segment": segment_from_range(rng), "continued": continued})
+            for lvl, marker, title, rng, continued in parse_div(text, int(mlvl.group(1)) + 1):
+                events.append({"type": "outline", "level": lvl,
+                               "marker": marker, "title": title, "range": rng,
+                               "segment": segment_from_range(rng), "continued": continued})
         elif el.name == "p" and "calibre2" in (el.get("class") or []) and cur_ch is not None:
             sup = el.find("sup")
             if sup is None:
