@@ -45,6 +45,13 @@ def normalize(s: str) -> str:
     return "".join(NORM_MAP.get(c, c) for c in s)
 
 
+def halfwidth(s: str) -> str:
+    """Full-width parens → half-width, full-width space → space, and ')(' → ') ('."""
+    s = s.replace("（", "(").replace("）", ")").replace("　", " ")
+    s = s.replace(")(", ") (")
+    return s
+
+
 # A section marker: capital/CN numerals, arabic, a letter, a parenthesised
 # number, or a 卷X. It is followed by '.'/'．', a regular space, or 　.
 _MARKER = r"(?:[壹貳參肆伍陸柒捌玖拾]+|[一二三四五六七八九十百]+|\d+|[A-Za-z]|（[^）]+）|卷[一二三四五六七八九十]+)"
@@ -174,10 +181,10 @@ def parse_book_outline(html: str, book_no: int, chapter_count: int) -> list[dict
         anchor = {"chapter": nxt["chapter"], "verse": nxt["verse"]}
         if ev["segment"] > 0:
             anchor["segment"] = ev["segment"]
-        entry = {"level": ev["level"], "marker": ev["marker"], "title": ev["title"],
-                 "anchor": anchor}
+        entry = {"level": ev["level"], "marker": halfwidth(ev["marker"]),
+                 "title": halfwidth(ev["title"]), "anchor": anchor}
         if ev["range"]:
-            entry["range"] = ev["range"]
+            entry["range"] = halfwidth(ev["range"])
         if ev["continued"]:
             entry["continued"] = True
         out.append(entry)
