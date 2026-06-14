@@ -3,6 +3,13 @@
 .env
 .env.*
 
+# Python scraper
+scripts/.venv/
+scripts/cache/
+scripts/output/
+__pycache__/
+*.pyc
+
 # Logs
 logs
 *.log
