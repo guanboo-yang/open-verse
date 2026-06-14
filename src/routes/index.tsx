@@ -1,14 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
-  component: HomeComponent,
+  beforeLoad: () => {
+    throw redirect({ to: '/$bookNo/$chapterNo', params: { bookNo: 1, chapterNo: 1 } })
+  },
 })
-
-function HomeComponent() {
-  return (
-    <div className="p-8">
-      <h1 className="text-4xl font-bold">Open Verse</h1>
-      <p className="mt-2 text-gray-600">Tailwind + TanStack Router 已就緒。</p>
-    </div>
-  )
-}
