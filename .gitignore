@@ -6,6 +6,7 @@
 # Python scraper
 scripts/.venv/
 scripts/cache/
+scripts/cache_new/
 scripts/output/
 __pycache__/
 *.pyc

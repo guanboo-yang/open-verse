@@ -8,6 +8,8 @@ export interface Verse {
   text: string
   segments?: string[]
   notes?: Note[]
+  /** Text length changed vs the annotated edition — note positions need rechecking. */
+  noteShift?: boolean
 }
 
 export interface Chapter {
