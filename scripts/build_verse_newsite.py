@@ -20,17 +20,20 @@ from compare_text import fetch_book, parse_book, norm
 # True orthographic variants (異體字): where new-site char differs from ours by one
 # of these, keep OUR character. Everything else (genuine rewording, and the
 # 「」 quote marks) takes the new-site text. Each entry is "ours→newsite".
+# NOTE: 那→哪, 儘→盡, 什→甚, 複→復, 瞭→了 are intentionally NOT here — for those
+# our old data used the archaic/less-correct form, so we keep the new site's
+# (common) char instead of reverting.
 _VARIANT_PAIRS = """
 裡→裏 衛→衞 群→羣 牠→它 舍→捨 崙→侖 麵→面 罵→駡 蹟→迹 軟→輭 床→牀 餘→余
-略→畧 那→哪 冤→寃 痲→麻 瘋→風 鍊→鏈 啟→啓 託→托 乾→干 毀→譭 鉤→鈎 冑→胄
+略→畧 冤→寃 痲→麻 瘋→風 鍊→鏈 啟→啓 託→托 乾→干 毀→譭 鉤→鈎 冑→胄
 儆→警 製→制 穀→谷 颳→刮 醡→搾 籤→簽 鬥→鬪 耽→躭 撚→捻 犁→犂 裏→里 愈→癒
-繙→翻 杆→桿 磚→甎 效→傚 罣→掛 髮→發 儘→盡 敘→敍 鎔→熔 吧→罷 隻→只 鬨→哄
-梁→樑 賙→周 臟→髒 盡→儘 佈→布 準→准 才→纔 蔯→陳 裡→里 繸→穗 困→睏 巖→岩
-鵰→雕 櫺→欞 摀→捂 沖→衝 餽→饋 榦→幹 凶→兇 彩→綵 挂→掛 什→甚 他→祂 姪→侄
-並→併 夥→伙 倣→仿 飢→饑 矇→蒙 慾→欲 惡→噁 后→後 榦→干 複→復 跡→迹 菴→庵
+繙→翻 杆→桿 磚→甎 效→傚 罣→掛 髮→發 敘→敍 鎔→熔 吧→罷 隻→只 鬨→哄
+梁→樑 賙→周 臟→髒 佈→布 準→准 才→纔 蔯→陳 裡→里 繸→穗 困→睏 巖→岩
+鵰→雕 櫺→欞 摀→捂 沖→衝 餽→饋 榦→幹 凶→兇 彩→綵 挂→掛 他→祂 姪→侄
+並→併 夥→伙 倣→仿 飢→饑 矇→蒙 慾→欲 惡→噁 后→後 榦→干 跡→迹 菴→庵
 剋→克 搆→構 遊→游 畫→劃 卷→捲 只→祇 颻→搖 讚→贊 檐→簷 罈→壇 扎→紮 咽→嚥
 採→采 衝→沖 絃→弦 捲→卷 采→採 占→佔 榨→搾 註→注 升→昇 啣→銜 係→系 鉋→刨
-杯→盃 家→傢 具→俱 耦→偶 鬱→郁 里→裏 銲→焊 餧→喂 瞭→了 薩→撒 返→反 干→幹
+杯→盃 家→傢 具→俱 耦→偶 鬱→郁 里→裏 銲→焊 餧→喂 薩→撒 返→反 干→幹
 墜→墮 它→他 佔→占 游→遊 劃→畫 併→並
 """
 TRUE_VARIANTS = {
