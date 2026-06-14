@@ -14,7 +14,7 @@ function OutlineHeading({ entry, tight }: { entry: OutlineEntry; tight: boolean 
     const inner = entry.marker ? `${entry.marker} ${entry.title}` : entry.title
     return (
       <div className={cls} style={indent}>
-        <span>({inner})</span>
+        <span>({inner}) - 續</span>
       </div>
     )
   }
