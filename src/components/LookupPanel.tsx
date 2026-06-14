@@ -1,0 +1,194 @@
+import { Fragment, useMemo, useRef } from 'react'
+import { useNavigate, useLocation } from '@tanstack/react-router'
+import { parseRefs, segmentInput, type VerseRef } from '@/lib/parseRefs'
+import { useBible, findChapter } from '@/data/loadBible'
+import { BOOK_ABBREV } from '@/data/abbrev'
+import { toChineseDigits } from '@/lib/chinese'
+import { useLocalStorage } from '@/lib/useLocalStorage'
+import { cn } from '@/lib/utils'
+import type { Verse } from '@/types/bible'
+
+const FIELD_CLS = 'rounded-md border p-2.5 font-serif text-sm leading-relaxed'
+
+const PLACEHOLDER =
+  '輸入經文出處，例如：\n約翰福音一章一節，三章十六節，十四章六節'
+
+interface ResolvedVerse {
+  bookNo: number
+  chapterNo: number
+  verse: Verse
+  ref: VerseRef
+}
+
+function refHl(ref: VerseRef): string {
+  return ref.verseStart === ref.verseEnd
+    ? String(ref.verseStart)
+    : `${ref.verseStart}-${ref.verseEnd}`
+}
+
+function refKey(bookNo: number, chapterNo: number, hl: string): string {
+  return `${bookNo}/${chapterNo}/${hl}`
+}
+
+function renderBackdrop(
+  segments: { text: string; token: boolean }[],
+  statuses: boolean[],
+  refs: VerseRef[],
+  activeKey: string | null,
+) {
+  let tokenIndex = 0
+  let refIndex = 0
+  return segments.map((seg, i) => {
+    if (!seg.token) return <Fragment key={i}>{seg.text}</Fragment>
+    const ok = statuses[tokenIndex++] ?? true
+    if (!ok) {
+      return (
+        <span key={i} className="rounded-sm bg-destructive/15 text-destructive">
+          {seg.text}
+        </span>
+      )
+    }
+    const ref = refs[refIndex++]
+    const isActive =
+      ref != null && activeKey === refKey(ref.bookNo, ref.chapterNo, refHl(ref))
+    return isActive ? (
+      <span key={i} className="rounded-sm bg-yellow-400/25">
+        {seg.text}
+      </span>
+    ) : (
+      <Fragment key={i}>{seg.text}</Fragment>
+    )
+  })
+}
+
+export function LookupPanel() {
+  const [q, setQ] = useLocalStorage('open-verse/lookup-q', '')
+  const { data, error } = useBible()
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const activeMatch = location.pathname.match(/^\/(\d+)\/(\d+)/)
+  const activeBookNo = activeMatch ? Number(activeMatch[1]) : null
+  const activeChapterNo = activeMatch ? Number(activeMatch[2]) : null
+  const activeHl = (location.search as { hl?: string }).hl
+  const activeKey =
+    activeBookNo != null && activeChapterNo != null && activeHl != null
+      ? refKey(activeBookNo, activeChapterNo, activeHl)
+      : null
+
+  const { refs, statuses } = useMemo(() => parseRefs(q), [q])
+  const segments = useMemo(() => segmentInput(q), [q])
+  const backdropRef = useRef<HTMLDivElement>(null)
+
+  const resolved = useMemo<ResolvedVerse[]>(() => {
+    if (!data) return []
+    const out: ResolvedVerse[] = []
+    for (const ref of refs) {
+      const chapter = findChapter(data, ref.bookNo, ref.chapterNo)
+      if (!chapter) continue
+      for (const v of chapter.verses) {
+        if (v.verse >= ref.verseStart && v.verse <= ref.verseEnd) {
+          out.push({ bookNo: ref.bookNo, chapterNo: ref.chapterNo, verse: v, ref })
+        }
+      }
+    }
+    return out
+  }, [refs, data])
+
+  const openRef = (r: ResolvedVerse) => {
+    navigate({
+      to: '/$bookNo/$chapterNo',
+      params: { bookNo: r.bookNo, chapterNo: r.chapterNo },
+      search: { hl: refHl(r.ref) },
+    })
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="border-b border-border p-3">
+        <div className="relative">
+          {/* Backdrop: same text, failed tokens in red */}
+          <div
+            ref={backdropRef}
+            aria-hidden
+            className={cn(
+              FIELD_CLS,
+              'pointer-events-none absolute inset-0 overflow-auto whitespace-pre-wrap break-words border-transparent text-foreground',
+            )}
+          >
+            {renderBackdrop(segments, statuses, refs, activeKey)}
+          </div>
+          <textarea
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onScroll={(e) => {
+              if (backdropRef.current) backdropRef.current.scrollTop = e.currentTarget.scrollTop
+            }}
+            placeholder={PLACEHOLDER}
+            spellCheck={false}
+            className={cn(
+              FIELD_CLS,
+              'relative block min-h-[120px] w-full resize-y break-words bg-transparent text-transparent caret-foreground outline-none placeholder:text-muted-foreground border-input focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30',
+            )}
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3">
+        {error ? (
+          <p className="text-sm text-destructive">資料載入失敗：{error}</p>
+        ) : q.trim() === '' ? (
+          <p className="text-sm text-muted-foreground">輸入經文出處以查詢</p>
+        ) : !data ? (
+          <p className="text-sm text-muted-foreground">載入中…</p>
+        ) : (
+          <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-2.5 font-serif text-sm leading-relaxed">
+            {resolved.map((r, i) => {
+              const active =
+                activeBookNo === r.bookNo &&
+                activeChapterNo === r.chapterNo &&
+                activeHl === refHl(r.ref)
+              return (
+                <ResultRow key={i} resolved={r} active={active} onClick={() => openRef(r)} />
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ResultRow({
+  resolved,
+  active,
+  onClick,
+}: {
+  resolved: ResolvedVerse
+  active: boolean
+  onClick: () => void
+}) {
+  const { bookNo, chapterNo, verse } = resolved
+  const abbrev = BOOK_ABBREV[bookNo] ?? ''
+  const label = `${abbrev}${toChineseDigits(chapterNo)}${verse.verse}`
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'self-start whitespace-nowrap pt-1 text-left text-xs font-sans transition-colors hover:text-foreground hover:underline',
+          active ? 'font-medium text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        {label}
+      </button>
+      <p
+        onClick={onClick}
+        className="cursor-pointer text-foreground/90 hover:text-foreground"
+      >
+        {verse.text}
+      </p>
+    </>
+  )
+}
