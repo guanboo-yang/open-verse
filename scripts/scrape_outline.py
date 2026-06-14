@@ -59,12 +59,15 @@ TRAILING_RANGE_RE = re.compile(
 # scope and description is dropped by the parser, so split on the 篇 scope).
 PSALMS_SCOPE_RE = re.compile(r"^(第[零一二三四五六七八九十百]+至[零一二三四五六七八九十百]+篇)(.+)$")
 
+# A leading section marker followed by a full-width space, used to peel the
+# inner marker out of a continuation label like 「（八　進一步的失敗－續）」.
+LEADING_MARKER_RE = re.compile(
+    r"^([壹貳參肆伍陸柒捌玖拾]+|[一二三四五六七八九十百]+|\d+|[a-zA-Z]|（[^）]+）|卷[一二三四五六七八九十]+)　"
+)
 
-def split_title_range(title_b) -> tuple[str, str]:
-    """Return (title, range) from an outline title cell, handling: full-width-space
-    separated, Psalms 篇-scope headers, and a range glued to the end of the title.
-    """
-    text = title_b.get_text(strip=True)
+
+def split_text(text: str) -> tuple[str, str]:
+    """Split a title-cell string into (title, range)."""
     m = PSALMS_SCOPE_RE.match(text)
     if m:
         return m.group(2), m.group(1)
@@ -75,6 +78,25 @@ def split_title_range(title_b) -> tuple[str, str]:
     if m:
         return text[: m.start()].strip(), m.group(0).strip()
     return text, ""
+
+
+def split_title_range(title_b) -> tuple[str, str]:
+    return split_text(title_b.get_text(strip=True))
+
+
+def parse_continued(text: str) -> tuple[str, str, str]:
+    """Parse a blank-marker continuation label like 「（八　進一步的失敗－續）」
+    into (marker, title, range). Marker is '' when none is present."""
+    inner = text
+    if inner.startswith("（") and inner.endswith("）"):
+        inner = inner[1:-1]
+    marker = ""
+    m = LEADING_MARKER_RE.match(inner)
+    if m:
+        marker = m.group(1)
+        inner = inner[m.end():]
+    title, rng = split_text(inner)
+    return marker, title, rng
 
 
 def parse_chapter_outline(html: str, chapter_no: int, warnings: list[str], book_name: str):
@@ -110,26 +132,35 @@ def parse_chapter_outline(html: str, chapter_no: int, warnings: list[str], book_
         if b is None:
             continue
         marker = b.get_text(strip=True)
-        if not marker:
-            continue
         title_td = marker_td.find_next_sibling("td")
         if title_td is None:
             continue
         title_b = title_td.find("b")
         if title_b is None:
             continue
-        if not title_b.get_text(strip=True):
+        raw = title_b.get_text(strip=True)
+        if not raw:
             continue
-        title, rng = split_title_range(title_b)
-        events.append(
-            {
-                "type": "outline",
-                "level": int(marker_td["title"]),
-                "marker": marker,
-                "title": title,
-                "range": rng,
-            }
-        )
+
+        continued = False
+        if marker:
+            title, rng = split_title_range(title_b)
+        else:
+            # Blank marker = a continuation / parenthetical heading repeated at a
+            # chapter top, e.g. 「（八　進一步的失敗－續）」.
+            marker, title, rng = parse_continued(raw)
+            continued = "續" in raw
+
+        entry = {
+            "type": "outline",
+            "level": int(marker_td["title"]),
+            "marker": marker,
+            "title": title,
+            "range": rng,
+        }
+        if continued:
+            entry["continued"] = True
+        events.append(entry)
 
     # Resolve each outline heading to the next verse event after it.
     out: list[dict] = []
@@ -154,6 +185,8 @@ def parse_chapter_outline(html: str, chapter_no: int, warnings: list[str], book_
         }
         if ev["range"]:
             entry["range"] = ev["range"]
+        if ev.get("continued"):
+            entry["continued"] = True
         out.append(entry)
     return out
 
