@@ -31,3 +31,43 @@ export function toChineseDigits(n: number): string {
 export function chapterUnit(bookNo: number): string {
   return bookNo === 19 ? '篇' : '章'
 }
+
+/**
+ * Chapter numeral as used in Bible outline ranges: 11–19 keep 十 (十三), round
+ * tens keep 十 (二十、五十), but 21–99 drop it (二五 = 25, 三七 = 37). 100+ falls
+ * back to the spelled-out form (not reached for the 66-book canon).
+ */
+function chapterNumeral(n: number): string {
+  if (n < 20 || n >= 100) return toChineseNumber(n)
+  const tens = Math.floor(n / 10)
+  const ones = n % 10
+  return DIGITS[tens] + (ones === 0 ? '十' : DIGITS[ones])
+}
+
+const ENDPOINT_RE = /^(?:(\d+)[:：])?(\d+)([a-z])?$/
+
+function formatEndpoint(s: string): string {
+  const m = s.trim().match(ENDPOINT_RE)
+  if (!m) return s.trim()
+  const [, ch, verse, seg] = m
+  const segCh = seg === 'a' ? '上' : seg === 'b' ? '下' : ''
+  return (ch ? chapterNumeral(Number(ch)) : '') + verse + segCh
+}
+
+/**
+ * Format an outline range for display: chapter→Chinese numeral, verse kept as
+ * digits, the 上/下 切段 from a/b. e.g. "1:1～2:25" → "一1～二25", "1:2b～2:3" →
+ * "一2下～二3". Composite ranges (，-separated) and within-chapter endpoints
+ * (no chapter, e.g. "24～25") are preserved.
+ */
+export function formatOutlineRange(range: string): string {
+  return range
+    .split('，')
+    .map((part) =>
+      part
+        .split(/[～~∼]/)
+        .map(formatEndpoint)
+        .join('～'),
+    )
+    .join('，')
+}

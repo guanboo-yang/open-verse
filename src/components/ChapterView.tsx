@@ -1,8 +1,48 @@
 import { Fragment, useEffect, useRef, type ReactNode } from 'react'
 import { useBible, useOutline, findChapter, chapterOutlineByAnchor } from '@/data/loadBible'
 import { BOOK_BY_NO } from '@/data/canon'
-import { toChineseNumber, chapterUnit } from '@/lib/chinese'
-import type { OutlineEntry } from '@/types/bible'
+import { toChineseNumber, chapterUnit, formatOutlineRange } from '@/lib/chinese'
+import type { Mark, OutlineEntry } from '@/types/bible'
+
+// 人名 單底線、地名 雙底線、補字 點底線（音譯 tl 不標）；線用淡色
+const MARK_CLASS: Record<string, string> = {
+  pn: 'underline decoration-1 decoration-muted-foreground/60 underline-offset-4',
+  png: 'underline decoration-double decoration-1 decoration-muted-foreground/60 underline-offset-4',
+  add: 'underline decoration-dotted decoration-1 decoration-muted-foreground/60 underline-offset-4',
+}
+
+/** Marks overlapping [start, end), re-based to that slice. */
+function sliceMarks(marks: Mark[] | undefined, start: number, end: number): Mark[] {
+  if (!marks) return []
+  const out: Mark[] = []
+  for (const m of marks) {
+    const s = Math.max(m.s, start)
+    const e = Math.min(m.e, end)
+    if (e > s) out.push({ k: m.k, s: s - start, e: e - start })
+  }
+  return out
+}
+
+function renderMarkedText(text: string, marks?: Mark[]): ReactNode {
+  const ms = (marks ?? [])
+    .filter((m) => MARK_CLASS[m.k] && m.e > m.s)
+    .sort((a, b) => a.s - b.s)
+  if (ms.length === 0) return text
+  const out: ReactNode[] = []
+  let pos = 0
+  ms.forEach((m, i) => {
+    if (m.s < pos) return // skip an overlapping mark already covered
+    if (m.s > pos) out.push(text.slice(pos, m.s))
+    out.push(
+      <span key={i} className={MARK_CLASS[m.k]}>
+        {text.slice(m.s, m.e)}
+      </span>,
+    )
+    pos = m.e
+  })
+  if (pos < text.length) out.push(text.slice(pos))
+  return out
+}
 
 function OutlineHeading({ entry, tight }: { entry: OutlineEntry; tight: boolean }) {
   const cls =
@@ -10,25 +50,31 @@ function OutlineHeading({ entry, tight }: { entry: OutlineEntry; tight: boolean 
     (tight ? '' : 'pt-2 first:pt-0')
   const indent = { paddingLeft: `${(entry.level - 1) * 0.5}rem` }
 
-  if (entry.continued) {
-    const inner = entry.marker ? `${entry.marker} ${entry.title}` : entry.title
-    return (
-      <div className={cls} style={indent}>
-        <span>({inner}) - 續</span>
-      </div>
-    )
-  }
   return (
     <div className={cls} style={indent}>
       {entry.marker && <span className="shrink-0">{entry.marker}</span>}
-      <span>{entry.title}</span>
+      <span>
+        {entry.title}
+        {entry.continued && ' (續)'}
+        {entry.range && (
+          <span className="ml-1.5 text-muted-foreground/60">{formatOutlineRange(entry.range)}</span>
+        )}
+      </span>
     </div>
   )
 }
 
 type Row =
   | { kind: 'heading'; entry: OutlineEntry; tight: boolean; key: string }
-  | { kind: 'verse'; num: number | ''; text: string; hl: boolean; ref: boolean; key: string }
+  | {
+      kind: 'verse'
+      num: number | ''
+      text: string
+      marks?: Mark[]
+      hl: boolean
+      ref: boolean
+      key: string
+    }
 
 export function ChapterView({
   bookNo,
@@ -92,16 +138,19 @@ export function ChapterView({
         })
 
       if (anyMid && v.segments) {
+        let off = 0
         v.segments.forEach((segText, s) => {
           headingsAt(s).forEach((e, i) => pushHeading(e, `h${v.verse}-${s}-${i}`))
           rows.push({
             kind: 'verse',
             num: s === 0 && v.verse !== 0 ? v.verse : '',
             text: segText,
+            marks: sliceMarks(v.marks, off, off + segText.length),
             hl,
             ref: isFirst && s === 0,
             key: `v${v.verse}-${s}`,
           })
+          off += segText.length
         })
       } else {
         headingsAt(0).forEach((e, i) => pushHeading(e, `h${v.verse}-${i}`))
@@ -109,6 +158,7 @@ export function ChapterView({
           kind: 'verse',
           num: v.verse === 0 ? '' : v.verse,
           text: v.text,
+          marks: v.marks,
           hl,
           ref: isFirst,
           key: `v${v.verse}`,
@@ -147,7 +197,7 @@ export function ChapterView({
                   {r.num}
                 </span>
                 <p className={r.hl ? 'rounded bg-yellow-400/25 px-1 -mx-1' : undefined}>
-                  {r.text}
+                  {renderMarkedText(r.text, r.marks)}
                 </p>
               </Fragment>
             ),

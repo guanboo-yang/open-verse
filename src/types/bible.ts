@@ -3,10 +3,19 @@ export interface Note {
   pos: number
 }
 
+/** Inline semantic span over `text` (offsets are char indices). */
+export interface Mark {
+  /** pn=人名, png=地名, add=補字, tl=音譯 */
+  k: 'pn' | 'png' | 'add' | 'tl'
+  s: number
+  e: number
+}
+
 export interface Verse {
   verse: number
   text: string
   segments?: string[]
+  marks?: Mark[]
   notes?: Note[]
   /** Text length changed vs the annotated edition — note positions need rechecking. */
   noteShift?: boolean
