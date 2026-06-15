@@ -4,6 +4,12 @@ import { BookOpen, LayoutGrid, List, Search } from 'lucide-react'
 import { CANON, BOOK_BY_NO, type CanonBook } from '@/data/canon'
 import { BOOK_ABBREV } from '@/data/abbrev'
 import { LookupPanel } from '@/components/LookupPanel'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useLocalStorage } from '@/lib/useLocalStorage'
 import { cn } from '@/lib/utils'
 
@@ -173,13 +179,15 @@ function BookSection({
 }) {
   if (view === 'grid') {
     return (
-      <div className="p-2">
-        <div className="grid grid-cols-5 gap-1">
-          {books.map((b) => (
-            <BookGridCell key={b.bookNo} book={b} active={activeBookNo === b.bookNo} />
-          ))}
+      <TooltipProvider delay={0}>
+        <div className="p-2">
+          <div className="grid grid-cols-5 gap-1">
+            {books.map((b) => (
+              <BookGridCell key={b.bookNo} book={b} active={activeBookNo === b.bookNo} />
+            ))}
+          </div>
         </div>
-      </div>
+      </TooltipProvider>
     )
   }
   return (
@@ -212,19 +220,25 @@ function BookLink({ bookNo, name, active }: { bookNo: number; name: string; acti
 function BookGridCell({ book, active }: { book: CanonBook; active: boolean }) {
   const abbrev = BOOK_ABBREV[book.bookNo] ?? book.name.slice(0, 1)
   return (
-    <Link
-      to="/$bookNo/$chapterNo"
-      params={{ bookNo: book.bookNo, chapterNo: 1 }}
-      search={{}}
-      title={book.name}
-      className={cn(
-        'flex aspect-square items-center justify-center rounded-md text-sm transition-colors',
-        active
-          ? 'bg-secondary text-secondary-foreground font-medium'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-      )}
-    >
-      {abbrev}
-    </Link>
+    <Tooltip disableHoverablePopup>
+      <TooltipTrigger
+        render={
+          <Link
+            to="/$bookNo/$chapterNo"
+            params={{ bookNo: book.bookNo, chapterNo: 1 }}
+            search={{}}
+            className={cn(
+              'flex aspect-square items-center justify-center rounded-md text-sm transition-colors',
+              active
+                ? 'bg-secondary text-secondary-foreground font-medium'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          />
+        }
+      >
+        {abbrev}
+      </TooltipTrigger>
+      <TooltipContent>{book.name}</TooltipContent>
+    </Tooltip>
   )
 }
