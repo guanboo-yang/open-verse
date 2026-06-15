@@ -1,11 +1,15 @@
-"""Rebuild verse.json using line.twgbr.org text, carrying over our notes/segments.
+"""Merge the old and new editions into the best verse.json (→ public/verse.json).
 
-- `text` for every verse is taken from the new site (line.twgbr.org).
-- `notes` (annotation positions) are carried over from the old scrape. Where the
-  new text has a different character length, the old note offsets no longer line
-  up, so the verse is flagged `noteShift: true` for later manual fixing.
-- `segments` are kept only when the text is unchanged (otherwise the old split no
-  longer matches the new text and is dropped).
+Combines:
+  - new-site text (scrape_verse_new) for the latest wording and the 「」 quotes,
+  - our preferred orthographic variants (裡/牠/衛…) reverted in via position-
+    aligned comparison, so only genuine rewordings actually change,
+  - notes & segments carried over from the old-site scrape (output/verse_old.json),
+    which is also the source for the variant reversions.
+
+Where the merged text changes a verse's length, old note offsets no longer line
+up, so the verse is flagged `noteShift: true`. Old segments are re-split onto the
+new text when the length matches, else dropped.
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ import json
 import sys
 from pathlib import Path
 
-from compare_text import fetch_book, parse_book, norm
+from scrape_verse_new import fetch_book, parse_book, norm
 
 # True orthographic variants (異體字): where new-site char differs from ours by one
 # of these, keep OUR character. Everything else (genuine rewording, and the
@@ -54,7 +58,7 @@ def merge_text(old_text: str, new_text: str) -> str:
 
 
 SCRIPT_DIR = Path(__file__).parent
-OLD_VERSE = SCRIPT_DIR / "output" / "verse.json"
+OLD_VERSE = SCRIPT_DIR / "output" / "verse_old.json"
 DEFAULT_OUT = SCRIPT_DIR.parent / "public" / "verse.json"
 
 

@@ -34,7 +34,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from scrape_recovery import BOOK_NAMES, CACHE_DIR, fetch_menu
+from scrape_verse_old import BOOK_NAMES, CACHE_DIR, fetch_menu
 
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_FILE = OUTPUT_DIR / "outline.json"

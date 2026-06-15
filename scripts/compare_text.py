@@ -1,103 +1,19 @@
-"""Scrape verse text from line.twgbr.org and compare with our verse.json.
-
-The site serves one HTML page per book (01.html .. 66.html). Chapters are
-marked by <h3 id="C{n}...">, verses by <sup>N</sup> inside <p class="calibre2">.
-This site does not split verses into segments, so its verse text is compared
-against our merged `text` field.
+"""Compare our old-site verse text (output/verse_old.json) with the new-site
+edition (scrape_verse_new), classifying each difference as variant / punct /
+wording and writing the diff lists to output/cmp_*.txt.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
-import time
 from pathlib import Path
 
-import requests
-from bs4 import BeautifulSoup, NavigableString, Tag
+from scrape_verse_new import CACHE_DIR, fetch_book, parse_book, norm
 
-BASE_URL = "https://line.twgbr.org/recoveryversion/bible/{book:02d}.html"
 SCRIPT_DIR = Path(__file__).parent
-CACHE_DIR = SCRIPT_DIR / "cache_new"
-VERSE_JSON = SCRIPT_DIR / "output" / "verse.json"
-DELAY = 0.4
-UA = "open-verse-compare/0.1 (study tool; github.com/guanboo-yang/open-verse)"
-
-# Chapter number from the <h3> TEXT ("… 第 N 章/篇"). The id (e.g. C11Sam =
-# C1 + 1Sam, C12John = C1 + 2John) is ambiguous because some book suffixes start
-# with a digit, so we never parse the id number. A book with no "第 N 章" text is
-# single-chapter (俄巴底亞書, 約翰二書…) → chapter 1.
-CHAPTER_TEXT_RE = re.compile(r"第\s*(\d+)\s*[章篇]")
-
-
-def fetch_book(book_no: int, use_cache: bool = True) -> str:
-    cache = CACHE_DIR / f"{book_no:02d}.html"
-    if use_cache and cache.exists():
-        return cache.read_text(encoding="utf-8")
-    resp = requests.get(BASE_URL.format(book=book_no), headers={"User-Agent": UA}, timeout=30)
-    resp.raise_for_status()
-    resp.encoding = "utf-8"
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(resp.text, encoding="utf-8")
-    time.sleep(DELAY)
-    return resp.text
-
-
-def parse_book(html: str) -> dict[int, dict[int, str]]:
-    """Return {chapter: {verse: text}}.
-
-    Verse text is split on <sup> markers. The site wraps verses inconsistently
-    (sometimes <p class="calibre2">, sometimes a bare <p>), and a verse can span
-    a <p> boundary (a paragraph may open with the tail of the previous verse
-    before the next <sup>), so the verse number is carried across paragraphs
-    within a chapter and any leading text continues the previous verse.
-    """
-    soup = BeautifulSoup(html, "lxml")
-    chapters: dict[int, dict[int, str]] = {}
-    cur_ch: int | None = None
-    cur_verse: int | None = None
-    buf: list[str] = []
-
-    def flush():
-        if cur_ch is not None and cur_verse is not None and cur_verse >= 0:
-            txt = "".join(buf).strip()
-            if txt:
-                chapters[cur_ch][cur_verse] = chapters[cur_ch].get(cur_verse, "") + txt
-
-    for el in soup.find_all(["h3", "p"]):
-        if el.name == "h3":
-            if not el.get("id", "").startswith("C"):
-                continue
-            flush()
-            buf = []
-            cur_verse = None
-            m = CHAPTER_TEXT_RE.search(el.get_text())
-            cur_ch = int(m.group(1)) if m else 1
-            chapters.setdefault(cur_ch, {})
-        elif el.name == "p" and cur_ch is not None and el.find("sup") is not None:
-            for node in el.descendants:
-                if isinstance(node, Tag) and node.name == "sup":
-                    flush()
-                    buf = []
-                    t = node.get_text().strip()
-                    mnum = re.match(r"(\d+)", t)
-                    if mnum:
-                        cur_verse = int(mnum.group(1))  # "3", "3上", "3下" → 3
-                    else:
-                        cur_verse = 0  # superscription (詩篇 title)
-                        buf = [t]
-                elif isinstance(node, NavigableString):
-                    if node.parent is not None and node.parent.name == "sup":
-                        continue
-                    buf.append(str(node))
-    flush()
-    return chapters
-
-
-def norm(s: str) -> str:
-    return re.sub(r"\s+", "", s)
+VERSE_JSON = SCRIPT_DIR / "output" / "verse_old.json"
 
 
 # Orthographic variant groups treated as equal for classification. Each char in

@@ -17,7 +17,8 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from compare_text import fetch_book, CHAPTER_TEXT_RE
+from scrape_verse_new import fetch_book, CHAPTER_TEXT_RE
+from scrape_verse_old import BOOK_NAMES
 
 SCRIPT_DIR = Path(__file__).parent
 DEFAULT_OUT = SCRIPT_DIR.parent / "public" / "outline.json"
@@ -26,8 +27,6 @@ OLEVEL_RE = re.compile(r"^O([0-5])$")
 VERSE_SUP_RE = re.compile(r"(\d+)")
 # range start: optional CN chapter, arabic verse, optional 上/下
 RANGE_START_RE = re.compile(r"^[（(]?([零一二三四五六七八九十百]+)?(\d+)([上下])?")
-
-BOOK_NAMES_FILE = SCRIPT_DIR / "output" / "verse.json"
 
 # Normalise only UNAMBIGUOUS single-meaning archaic variants toward the common
 # form. Context-dependent pairs (復/複, 了/瞭, 甚/什, 谷/穀, 面/麵…) are left
@@ -198,7 +197,7 @@ def main() -> int:
     ap.add_argument("--pretty", action="store_true")
     args = ap.parse_args()
 
-    names = {b["bookNo"]: b["name"] for b in json.loads(BOOK_NAMES_FILE.read_text(encoding="utf-8"))["books"]}
+    names = {i + 1: name for i, name in enumerate(BOOK_NAMES)}
     books = [args.book] if args.book else list(range(1, 67))
     out_books = []
     for bn in books:
