@@ -17,8 +17,8 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from scrape_verse_new import fetch_book, CHAPTER_TEXT_RE
-from scrape_verse_old import BOOK_NAMES
+from scrape_verse_twgbr import fetch_book, CHAPTER_TEXT_RE
+from scrape_verse_recoveryversion import BOOK_NAMES
 
 SCRIPT_DIR = Path(__file__).parent
 DEFAULT_OUT = SCRIPT_DIR.parent / "public" / "outline.json"

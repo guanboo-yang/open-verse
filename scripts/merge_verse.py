@@ -1,7 +1,7 @@
 """Merge the old and new editions into the best verse.json (→ public/verse.json).
 
 Combines:
-  - new-site text (scrape_verse_new) for the latest wording and the 「」 quotes,
+  - new-site text (scrape_verse_twgbr) for the latest wording and the 「」 quotes,
   - our preferred orthographic variants (裡/牠/衛…) reverted in via position-
     aligned comparison, so only genuine rewordings actually change,
   - notes & segments carried over from the old-site scrape (output/verse_old.json),
@@ -19,7 +19,7 @@ import json
 import sys
 from pathlib import Path
 
-from scrape_verse_new import fetch_book, parse_book, norm
+from scrape_verse_twgbr import fetch_book, parse_book, norm
 
 # True orthographic variants (異體字): where new-site char differs from ours by one
 # of these, keep OUR character. Everything else (genuine rewording, and the

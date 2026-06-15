@@ -1,5 +1,5 @@
 """Compare our old-site verse text (output/verse_old.json) with the new-site
-edition (scrape_verse_new), classifying each difference as variant / punct /
+edition (scrape_verse_twgbr), classifying each difference as variant / punct /
 wording and writing the diff lists to output/cmp_*.txt.
 """
 
@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-from scrape_verse_new import CACHE_DIR, fetch_book, parse_book, norm
+from scrape_verse_twgbr import CACHE_DIR, fetch_book, parse_book, norm
 
 SCRIPT_DIR = Path(__file__).parent
 VERSE_JSON = SCRIPT_DIR / "output" / "verse_old.json"

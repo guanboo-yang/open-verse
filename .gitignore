@@ -7,9 +7,16 @@
 scripts/.venv/
 scripts/cache/
 scripts/cache_new/
+scripts/cache_yv/
 scripts/output/
 __pycache__/
 *.pyc
+
+# Large source artifacts (kept on disk, not in git)
+scripts/sources/
+
+# Local data backups
+*.bak
 
 # Logs
 logs

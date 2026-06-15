@@ -18,7 +18,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
 
-from scrape_verse_new import fetch_book, CHAPTER_TEXT_RE
+from scrape_verse_twgbr import fetch_book, CHAPTER_TEXT_RE
 
 SCRIPT_DIR = Path(__file__).parent
 OUR_OUTLINE = SCRIPT_DIR.parent / "public" / "outline.json"

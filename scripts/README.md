@@ -1,15 +1,16 @@
 # scripts — 經文與綱目資料管線
 
-聖經恢復本資料來自兩個官方網站,經爬取、比對、整併後產生 `public/verse.json`
-與 `public/outline.json`。需要 `.venv`(見 `requirements.txt`)。
+聖經恢復本資料來自三個官方網站,經爬取、比對、整併後產生 `public/verse.json`
+與 `public/outline.json`。需要 `.venv`(見 `requirements.txt`)。腳本檔名以**來源網站**命名。
 
-## 三個主要腳本(經文)
+## 經文爬蟲(每個檔對應一個來源網站)
 
-| 腳本 | 作用 | 來源 | 產出 |
+| 腳本 | 來源網站 | 產出 | 備註 |
 |---|---|---|---|
-| `scrape_verse_old.py` | **舊版爬經文** | recoveryversion.com.tw | `output/verse_old.json`(text + 切段 segments + 註釋位置 notes) |
-| `scrape_verse_new.py` | **新版爬經文** | line.twgbr.org | `output/verse_new.json`(較新版的 text,含方引號「」) |
-| `merge_verse.py` | **整併成最好的** | 上兩者 | `public/verse.json` |
+| `scrape_verse_recoveryversion.py` | recoveryversion.com.tw | `output/verse_old.json` | text + 切段 segments + 註釋位置 notes |
+| `scrape_verse_twgbr.py` | line.twgbr.org | (供 merge 直接讀) | 較新版修訂的 text,含方引號「」 |
+| `scrape_verse_youversion.py` | bible.com v4230 (YouVersion) | `output/verse_youversion.json` | 純經文(註釋不正確,略過);需 headless Chrome |
+| `merge_verse.py` | 上述前兩者 | `public/verse.json` | 整併成最好的版本 |
 
 整併原則:
 - **用字遣詞**用新版(最新修訂)、**方引號「」**用新版。
@@ -26,6 +27,7 @@
 ## 比對 / 診斷工具
 
 - `compare_text.py` — 新舊經文比對,分類 variant/punct/wording → `output/cmp_*.txt`
+- `compare_youversion.py` — bible.com(YouVersion)vs 目前成品 verse.json 比對 → `output/cmp_yv_*.txt`
 - `dump_verse_diffs.py` — 新舊經文差異輸出,分三類(異體字 / 標點引號 / 用字遣詞)→ `output/verse_diffs.txt`
 - `compare_outline.py` — 新舊綱目比對
 - `explore_outline.py`、`scan_continued.py` — 一次性結構探查(開發用)

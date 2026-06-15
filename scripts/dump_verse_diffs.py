@@ -13,7 +13,7 @@ import re
 import sys
 from pathlib import Path
 
-from scrape_verse_new import fetch_book, parse_book, norm
+from scrape_verse_twgbr import fetch_book, parse_book, norm
 from merge_verse import _VARIANT_PAIRS
 
 SCRIPT_DIR = Path(__file__).parent
