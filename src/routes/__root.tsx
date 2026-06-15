@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Outlet, createRootRoute, useLocation } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-import { BookOpen, ChevronDown, LayoutGrid, List, Search } from 'lucide-react'
+import { BookOpen, ChevronDown, LayoutGrid, List, Moon, Search, Settings, Sun } from 'lucide-react'
 import { CANON, BOOK_BY_NO, type CanonBook } from '@/data/canon'
 import { BOOK_ABBREV } from '@/data/abbrev'
 import { LookupPanel } from '@/components/LookupPanel'
@@ -19,7 +19,8 @@ export const Route = createRootRoute({
 })
 
 type BookView = 'list' | 'grid'
-type SidebarMode = 'catalog' | 'lookup'
+type SidebarMode = 'catalog' | 'lookup' | 'settings'
+type Theme = 'light' | 'dark'
 
 function RootComponent() {
   const { pathname } = useLocation()
@@ -30,7 +31,18 @@ function RootComponent() {
 
   const [mode, setMode] = useLocalStorage<SidebarMode>('open-verse/sidebar-mode', 'catalog')
   const [bookView, setBookView] = useLocalStorage<BookView>('open-verse/book-view', 'grid')
+  const [theme, setTheme] = useLocalStorage<Theme>(
+    'open-verse/theme',
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light',
+  )
+  const [showOutline, setShowOutline] = useLocalStorage('open-verse/show-outline', true)
   const [booksOpen, setBooksOpen] = useState(false)
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  }, [theme])
   // Book whose chapters are shown for picking — defaults to the book in the URL,
   // but selecting a book in the list only changes this (no navigation until a
   // chapter is chosen).
@@ -54,11 +66,34 @@ function RootComponent() {
         <NavButton active={mode === 'lookup'} label="查詢" onClick={() => setMode('lookup')}>
           <Search className="size-4" />
         </NavButton>
+        <NavButton
+          active={mode === 'settings'}
+          label="設定"
+          onClick={() => setMode('settings')}
+          className="mt-auto"
+        >
+          <Settings className="size-4" />
+        </NavButton>
       </nav>
 
       {mode === 'lookup' ? (
         <aside className="w-[426px] shrink-0 overflow-hidden border-r border-border bg-card">
           <LookupPanel />
+        </aside>
+      ) : mode === 'settings' ? (
+        <aside className="flex w-[213px] shrink-0 flex-col border-r border-border bg-card">
+          <StickyHeader>設定</StickyHeader>
+          <div className="flex flex-col divide-y divide-border">
+            <SettingRow label="主題">
+              <div className="flex gap-1 rounded-md bg-muted p-0.5">
+                <ThemeButton active={theme === 'light'} onClick={() => setTheme('light')} icon={Sun} label="淺" />
+                <ThemeButton active={theme === 'dark'} onClick={() => setTheme('dark')} icon={Moon} label="深" />
+              </div>
+            </SettingRow>
+            <SettingRow label="顯示綱目">
+              <Switch on={showOutline} onChange={() => setShowOutline(!showOutline)} />
+            </SettingRow>
+          </div>
         </aside>
       ) : (
         <aside className="flex w-[213px] shrink-0 flex-col border-r border-border bg-card">
@@ -122,11 +157,13 @@ function NavButton({
   active,
   label,
   onClick,
+  className,
   children,
 }: {
   active: boolean
   label: string
   onClick: () => void
+  className?: string
   children: React.ReactNode
 }) {
   return (
@@ -140,9 +177,69 @@ function NavButton({
         active
           ? 'bg-secondary text-secondary-foreground'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        className,
       )}
     >
       {children}
+    </button>
+  )
+}
+
+function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <span className="text-sm text-foreground">{label}</span>
+      {children}
+    </div>
+  )
+}
+
+function ThemeButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: typeof Sun
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+        active
+          ? 'bg-card text-foreground shadow-sm'
+          : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      <Icon className="size-3.5" />
+      {label}
+    </button>
+  )
+}
+
+function Switch({ on, onChange }: { on: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onChange}
+      className={cn(
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
+        on ? 'bg-primary' : 'bg-muted-foreground/30',
+      )}
+    >
+      <span
+        className={cn(
+          'inline-block size-4 rounded-full bg-card shadow transition-transform',
+          on ? 'translate-x-4.5' : 'translate-x-0.5',
+        )}
+      />
     </button>
   )
 }

@@ -2,12 +2,13 @@ import { Fragment, useEffect, useRef, type ReactNode } from 'react'
 import { useBible, useOutline, findChapter, chapterOutlineByAnchor } from '@/data/loadBible'
 import { BOOK_BY_NO } from '@/data/canon'
 import { toChineseNumber, chapterUnit, formatOutlineRange } from '@/lib/chinese'
+import { useLocalStorage } from '@/lib/useLocalStorage'
 import type { Mark, OutlineEntry } from '@/types/bible'
 
-// 人名 單底線、地名 雙底線、補字 點底線（音譯 tl 不標）；線用淡色
+// 人名 / 地名 單底線、補字 點底線（音譯 tl 不標）；線用淡色
 const MARK_CLASS: Record<string, string> = {
   pn: 'underline decoration-1 decoration-muted-foreground/60 underline-offset-4',
-  png: 'underline decoration-double decoration-1 decoration-muted-foreground/60 underline-offset-4',
+  png: 'underline decoration-1 decoration-muted-foreground/60 underline-offset-4',
   add: 'underline decoration-dotted decoration-1 decoration-muted-foreground/60 underline-offset-4',
 }
 
@@ -93,6 +94,7 @@ export function ChapterView({
 }) {
   const { data, error } = useBible()
   const { data: outline } = useOutline()
+  const [showOutline] = useLocalStorage('open-verse/show-outline', true)
   const book = BOOK_BY_NO.get(bookNo)
   const firstHighlightRef = useRef<HTMLSpanElement>(null)
 
@@ -112,7 +114,9 @@ export function ChapterView({
   }
 
   const chapter = findChapter(data, bookNo, chapterNo)
-  const outlineMap = chapterOutlineByAnchor(outline, bookNo, chapterNo)
+  const outlineMap = showOutline
+    ? chapterOutlineByAnchor(outline, bookNo, chapterNo)
+    : new Map<string, OutlineEntry[]>()
 
   const rows: Row[] = []
   if (chapter) {
@@ -184,7 +188,7 @@ export function ChapterView({
 
       <article className="mx-auto max-w-3xl px-8 py-10">
         {chapter ? (
-        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-2.5 font-serif text-base leading-relaxed">
+        <div className="grid grid-cols-[minmax(1.3125rem,auto)_1fr] gap-x-2 gap-y-2.5 font-serif text-base leading-relaxed">
           {rows.map((r) =>
             r.kind === 'heading' ? (
               <OutlineHeading key={r.key} entry={r.entry} tight={r.tight} />

@@ -1,4 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+
+// Same-tab subscribers per key, so all hook instances stay in sync when one
+// updates (localStorage 'storage' events don't fire in the originating tab).
+const subscribers = new Map<string, Set<(v: unknown) => void>>()
 
 export function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(() => {
@@ -11,12 +15,29 @@ export function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void]
   })
 
   useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value))
-    } catch {
-      // ignore quota / serialization errors
+    let set = subscribers.get(key)
+    if (!set) {
+      set = new Set()
+      subscribers.set(key, set)
     }
-  }, [key, value])
+    const fn = setValue as (v: unknown) => void
+    set.add(fn)
+    return () => {
+      set.delete(fn)
+    }
+  }, [key])
 
-  return [value, setValue]
+  const update = useCallback(
+    (v: T) => {
+      try {
+        localStorage.setItem(key, JSON.stringify(v))
+      } catch {
+        // ignore quota / serialization errors
+      }
+      subscribers.get(key)?.forEach((fn) => fn(v))
+    },
+    [key],
+  )
+
+  return [value, update]
 }
