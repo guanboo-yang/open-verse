@@ -94,7 +94,7 @@ function RootComponent() {
       )}
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto" data-scroll-restoration-id="main">
         <Outlet />
       </main>
 

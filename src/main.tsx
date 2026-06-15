@@ -9,6 +9,8 @@ const router = createRouter({
   basepath: import.meta.env.BASE_URL,
   defaultPreload: 'intent',
   scrollRestoration: true,
+  // the chapter content scrolls inside <main>, not window
+  scrollToTopSelectors: ['[data-scroll-restoration-id="main"]'],
   // Plain string search params (no JSON quoting) — keeps URLs like ?hl=34
   parseSearch: (searchStr) => {
     const params = new URLSearchParams(searchStr)

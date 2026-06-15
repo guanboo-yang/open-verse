@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef } from 'react'
+import { Fragment, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from '@tanstack/react-router'
 import { parseRefs, segmentInput, type VerseRef } from '@/lib/parseRefs'
 import { useBible, findChapter } from '@/data/loadBible'
@@ -79,6 +79,7 @@ export function LookupPanel() {
   const { refs, statuses } = useMemo(() => parseRefs(q), [q])
   const segments = useMemo(() => segmentInput(q), [q])
   const backdropRef = useRef<HTMLDivElement>(null)
+  const [hovered, setHovered] = useState<number | null>(null)
 
   const resolved = useMemo<ResolvedVerse[]>(() => {
     if (!data) return []
@@ -149,7 +150,14 @@ export function LookupPanel() {
                 activeChapterNo === r.chapterNo &&
                 activeHl === refHl(r.ref)
               return (
-                <ResultRow key={i} resolved={r} active={active} onClick={() => openRef(r)} />
+                <ResultRow
+                  key={i}
+                  resolved={r}
+                  active={active}
+                  hover={hovered === i}
+                  onHover={(h) => setHovered(h ? i : null)}
+                  onClick={() => openRef(r)}
+                />
               )
             })}
           </div>
@@ -162,31 +170,39 @@ export function LookupPanel() {
 function ResultRow({
   resolved,
   active,
+  hover,
+  onHover,
   onClick,
 }: {
   resolved: ResolvedVerse
   active: boolean
+  hover: boolean
+  onHover: (hovering: boolean) => void
   onClick: () => void
 }) {
   const { bookNo, chapterNo, verse } = resolved
   const abbrev = BOOK_ABBREV[bookNo] ?? ''
   const label = `${abbrev}${toChineseDigits(chapterNo)}${verse.verse}`
+  const lit = active || hover
+  const handlers = {
+    onClick,
+    onMouseEnter: () => onHover(true),
+    onMouseLeave: () => onHover(false),
+  }
   return (
     <>
       <button
         type="button"
-        onClick={onClick}
+        {...handlers}
         className={cn(
-          'self-start whitespace-nowrap pt-1 text-left text-xs font-sans transition-colors hover:text-foreground hover:underline',
-          active ? 'font-medium text-foreground' : 'text-muted-foreground',
+          'self-start cursor-pointer whitespace-nowrap pt-1 text-left text-xs font-sans transition-colors',
+          active && 'font-medium',
+          lit ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
         {label}
       </button>
-      <p
-        onClick={onClick}
-        className="cursor-pointer text-foreground/90 hover:text-foreground"
-      >
+      <p {...handlers} className={cn('cursor-pointer transition-colors', lit ? 'text-foreground' : 'text-foreground/90')}>
         {verse.text}
       </p>
     </>
