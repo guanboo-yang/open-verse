@@ -37,7 +37,7 @@ export function chapterUnit(bookNo: number): string {
  * tens keep 十 (二十、五十), but 21–99 drop it (二五 = 25, 三七 = 37). 100+ falls
  * back to the spelled-out form (not reached for the 66-book canon).
  */
-function chapterNumeral(n: number): string {
+export function chapterNumeral(n: number): string {
   if (n < 20 || n >= 100) return toChineseNumber(n)
   const tens = Math.floor(n / 10)
   const ones = n % 10

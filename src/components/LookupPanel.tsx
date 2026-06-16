@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from '@tanstack/react-router'
 import { parseRefs, segmentInput, type VerseRef } from '@/lib/parseRefs'
 import { useBible, findChapter } from '@/data/loadBible'
 import { BOOK_ABBREV } from '@/data/abbrev'
-import { toChineseDigits } from '@/lib/chinese'
+import { chapterNumeral } from '@/lib/chinese'
 import { useLocalStorage } from '@/lib/useLocalStorage'
 import { cn } from '@/lib/utils'
 import type { Verse } from '@/types/bible'
@@ -34,6 +34,7 @@ function renderBackdrop(
   segments: { text: string; token: boolean }[],
   statuses: boolean[],
   refs: VerseRef[],
+  refFound: boolean[],
   activeKey: string | null,
 ) {
   let tokenIndex = 0
@@ -41,7 +42,9 @@ function renderBackdrop(
   return segments.map((seg, i) => {
     if (!seg.token) return <Fragment key={i}>{seg.text}</Fragment>
     const ok = statuses[tokenIndex++] ?? true
-    if (!ok) {
+    // Failed to parse, OR parsed but the chapter/verse doesn't exist.
+    if (!ok || refFound[refIndex] === false) {
+      if (ok) refIndex++
       return (
         <span key={i} className="rounded-sm bg-destructive/15 text-destructive">
           {seg.text}
@@ -96,6 +99,15 @@ export function LookupPanel() {
     return out
   }, [refs, data])
 
+  // Per-ref: did it resolve to at least one real verse? (parsed but not found → error)
+  const refFound = useMemo<boolean[]>(() => {
+    if (!data) return refs.map(() => true)
+    return refs.map((ref) => {
+      const chapter = findChapter(data, ref.bookNo, ref.chapterNo)
+      return !!chapter && chapter.verses.some((v) => v.verse >= ref.verseStart && v.verse <= ref.verseEnd)
+    })
+  }, [refs, data])
+
   const openRef = (r: ResolvedVerse) => {
     navigate({
       to: '/$bookNo/$chapterNo',
@@ -117,7 +129,7 @@ export function LookupPanel() {
               'pointer-events-none absolute inset-0 overflow-auto whitespace-pre-wrap break-words border-transparent text-foreground',
             )}
           >
-            {renderBackdrop(segments, statuses, refs, activeKey)}
+            {renderBackdrop(segments, statuses, refs, refFound, activeKey)}
           </div>
           <textarea
             value={q}
@@ -182,7 +194,7 @@ function ResultRow({
 }) {
   const { bookNo, chapterNo, verse } = resolved
   const abbrev = BOOK_ABBREV[bookNo] ?? ''
-  const label = `${abbrev}${toChineseDigits(chapterNo)}${verse.verse}`
+  const label = `${abbrev}${chapterNumeral(chapterNo)}${verse.verse}`
   const lit = active || hover
   const handlers = {
     onClick,
