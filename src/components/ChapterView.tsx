@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useBible, useOutline, findChapter, chapterOutlineByAnchor } from '@/data/loadBible'
 import { BOOK_BY_NO } from '@/data/canon'
 import { toChineseNumber, chapterUnit, formatOutlineRange } from '@/lib/chinese'
@@ -45,14 +45,31 @@ function renderMarkedText(text: string, marks?: Mark[]): ReactNode {
   return out
 }
 
-function OutlineHeading({ entry, tight }: { entry: OutlineEntry; tight: boolean }) {
+function OutlineHeading({
+  entry,
+  tight,
+  highlight,
+  innerRef,
+}: {
+  entry: OutlineEntry
+  tight: boolean
+  highlight?: boolean
+  innerRef?: (el: HTMLDivElement | null) => void
+}) {
+  // Indent is a left margin (not padding) so the highlight bg starts at the
+  // text, not at the column edge. When highlighted, px-1 adds a little breathing
+  // room and the margins are pulled in by 0.25rem to compensate (no layout shift).
+  const indent = (entry.level - 1) * 0.5
   const cls =
     'col-start-2 flex gap-1.5 font-sans text-sm text-muted-foreground ' +
-    (tight ? '' : 'pt-2 first:pt-0')
-  const indent = { paddingLeft: `${(entry.level - 1) * 0.5}rem` }
+    (tight ? '' : 'mt-2 first:mt-0 ') +
+    (highlight ? 'rounded bg-yellow-400/25 px-1' : '')
+  const style = highlight
+    ? { marginLeft: `calc(${indent}rem - 0.25rem)`, marginRight: '-0.25rem' }
+    : { marginLeft: `${indent}rem` }
 
   return (
-    <div className={cls} style={indent}>
+    <div ref={innerRef} className={cls} style={style}>
       {entry.marker && <span className="shrink-0">{entry.marker}</span>}
       <span>
         {entry.title}
@@ -66,7 +83,7 @@ function OutlineHeading({ entry, tight }: { entry: OutlineEntry; tight: boolean 
 }
 
 type Row =
-  | { kind: 'heading'; entry: OutlineEntry; tight: boolean; key: string }
+  | { kind: 'heading'; entry: OutlineEntry; tight: boolean; hl: boolean; ref: boolean; key: string }
   | {
       kind: 'verse'
       num: number | ''
@@ -82,6 +99,7 @@ export function ChapterView({
   chapterNo,
   highlightStart,
   highlightEnd,
+  headingAnchor,
   leftAction,
   rightAction,
 }: {
@@ -89,6 +107,7 @@ export function ChapterView({
   chapterNo: number
   highlightStart?: number
   highlightEnd?: number
+  headingAnchor?: { verse: number; segment: number }
   leftAction?: ReactNode
   rightAction?: ReactNode
 }) {
@@ -96,12 +115,16 @@ export function ChapterView({
   const { data: outline } = useOutline()
   const [showOutline] = useLocalStorage('open-verse/show-outline', true)
   const book = BOOK_BY_NO.get(bookNo)
-  const firstHighlightRef = useRef<HTMLSpanElement>(null)
+  const scrollRef = useRef<HTMLElement | null>(null)
+  const assignScroll = useCallback((el: HTMLElement | null) => {
+    scrollRef.current = el
+  }, [])
+  const ohKey = headingAnchor ? `${headingAnchor.verse}.${headingAnchor.segment}` : ''
 
   useEffect(() => {
-    if (!data || highlightStart == null) return
-    firstHighlightRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [data, bookNo, chapterNo, highlightStart])
+    if (!data || (highlightStart == null && !ohKey)) return
+    scrollRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [data, bookNo, chapterNo, highlightStart, ohKey])
 
   if (error) {
     return <p className="p-8 text-sm text-destructive">資料載入失敗：{error}</p>
@@ -119,6 +142,7 @@ export function ChapterView({
     : new Map<string, OutlineEntry[]>()
 
   const rows: Row[] = []
+  let headingRefDone = false
   if (chapter) {
     for (const v of chapter.verses) {
       const hl =
@@ -133,18 +157,25 @@ export function ChapterView({
         segCount > 1 &&
         Array.from({ length: segCount }, (_, s) => s).some((s) => s > 0 && headingsAt(s).length > 0)
 
-      const pushHeading = (e: OutlineEntry, key: string) =>
+      const pushHeading = (e: OutlineEntry, key: string, seg: number) => {
+        const isTarget =
+          headingAnchor != null && headingAnchor.verse === v.verse && headingAnchor.segment === seg
+        const takeRef = isTarget && !headingRefDone
+        if (takeRef) headingRefDone = true
         rows.push({
           kind: 'heading',
           entry: e,
           tight: rows[rows.length - 1]?.kind === 'heading',
+          hl: isTarget,
+          ref: takeRef,
           key,
         })
+      }
 
       if (anyMid && v.segments) {
         let off = 0
         v.segments.forEach((segText, s) => {
-          headingsAt(s).forEach((e, i) => pushHeading(e, `h${v.verse}-${s}-${i}`))
+          headingsAt(s).forEach((e, i) => pushHeading(e, `h${v.verse}-${s}-${i}`, s))
           rows.push({
             kind: 'verse',
             num: s === 0 && v.verse !== 0 ? v.verse : '',
@@ -157,7 +188,7 @@ export function ChapterView({
           off += segText.length
         })
       } else {
-        headingsAt(0).forEach((e, i) => pushHeading(e, `h${v.verse}-${i}`))
+        headingsAt(0).forEach((e, i) => pushHeading(e, `h${v.verse}-${i}`, 0))
         rows.push({
           kind: 'verse',
           num: v.verse === 0 ? '' : v.verse,
@@ -191,11 +222,17 @@ export function ChapterView({
         <div className="grid grid-cols-[minmax(1.3125rem,auto)_1fr] gap-x-2 gap-y-2.5 font-serif text-base leading-relaxed">
           {rows.map((r) =>
             r.kind === 'heading' ? (
-              <OutlineHeading key={r.key} entry={r.entry} tight={r.tight} />
+              <OutlineHeading
+                key={r.key}
+                entry={r.entry}
+                tight={r.tight}
+                highlight={r.hl}
+                innerRef={r.ref ? assignScroll : undefined}
+              />
             ) : (
               <Fragment key={r.key}>
                 <span
-                  ref={r.ref ? firstHighlightRef : undefined}
+                  ref={r.ref ? assignScroll : undefined}
                   className="pt-1 text-right text-xs font-sans text-muted-foreground"
                 >
                   {r.num}

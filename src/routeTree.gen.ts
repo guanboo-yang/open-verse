@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BookNoIndexRouteImport } from './routes/$bookNo.index'
 import { Route as BookNoChapterNoRouteImport } from './routes/$bookNo.$chapterNo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BookNoIndexRoute = BookNoIndexRouteImport.update({
+  id: '/$bookNo/',
+  path: '/$bookNo/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BookNoChapterNoRoute = BookNoChapterNoRouteImport.update({
@@ -26,27 +32,31 @@ const BookNoChapterNoRoute = BookNoChapterNoRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$bookNo/$chapterNo': typeof BookNoChapterNoRoute
+  '/$bookNo/': typeof BookNoIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$bookNo/$chapterNo': typeof BookNoChapterNoRoute
+  '/$bookNo': typeof BookNoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$bookNo/$chapterNo': typeof BookNoChapterNoRoute
+  '/$bookNo/': typeof BookNoIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$bookNo/$chapterNo'
+  fullPaths: '/' | '/$bookNo/$chapterNo' | '/$bookNo/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$bookNo/$chapterNo'
-  id: '__root__' | '/' | '/$bookNo/$chapterNo'
+  to: '/' | '/$bookNo/$chapterNo' | '/$bookNo'
+  id: '__root__' | '/' | '/$bookNo/$chapterNo' | '/$bookNo/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BookNoChapterNoRoute: typeof BookNoChapterNoRoute
+  BookNoIndexRoute: typeof BookNoIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$bookNo/': {
+      id: '/$bookNo/'
+      path: '/$bookNo'
+      fullPath: '/$bookNo/'
+      preLoaderRoute: typeof BookNoIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$bookNo/$chapterNo': {
@@ -71,6 +88,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BookNoChapterNoRoute: BookNoChapterNoRoute,
+  BookNoIndexRoute: BookNoIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

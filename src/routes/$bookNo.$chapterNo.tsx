@@ -6,11 +6,14 @@ import { cn } from '@/lib/utils'
 
 interface ChapterSearch {
   hl?: string
+  /** Outline-heading anchor to highlight: "verse" or "verse.segment". */
+  oh?: string
 }
 
 export const Route = createFileRoute('/$bookNo/$chapterNo')({
   validateSearch: (search: Record<string, unknown>): ChapterSearch => ({
     hl: typeof search.hl === 'string' ? search.hl : undefined,
+    oh: typeof search.oh === 'string' ? search.oh : undefined,
   }),
   parseParams: (raw) => ({
     bookNo: Number(raw.bookNo),
@@ -29,22 +32,33 @@ export const Route = createFileRoute('/$bookNo/$chapterNo')({
   component: ChapterPage,
 })
 
-function ArrowLink({
-  target,
-  children,
-}: {
-  target: { bookNo: number; chapterNo: number } | null
-  children: React.ReactNode
-}) {
+type NavTarget =
+  | { kind: 'chapter'; bookNo: number; chapterNo: number }
+  | { kind: 'outline'; bookNo: number }
+  | null
+
+function ArrowLink({ target, children }: { target: NavTarget; children: React.ReactNode }) {
   const cls = cn(
-    'inline-flex size-9 items-center justify-center rounded-md transition-colors',
+    'inline-flex size-9 items-center justify-center rounded-md',
     target
       ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
       : 'text-muted-foreground/40 pointer-events-none',
   )
   if (!target) return <span className={cls}>{children}</span>
+  if (target.kind === 'outline') {
+    return (
+      <Link to="/$bookNo" params={{ bookNo: target.bookNo }} className={cls}>
+        {children}
+      </Link>
+    )
+  }
   return (
-    <Link to="/$bookNo/$chapterNo" params={target} search={{}} className={cls}>
+    <Link
+      to="/$bookNo/$chapterNo"
+      params={{ bookNo: target.bookNo, chapterNo: target.chapterNo }}
+      search={{}}
+      className={cls}
+    >
       {children}
     </Link>
   )
@@ -59,14 +73,27 @@ function parseHighlight(hl: string | undefined): { start?: number; end?: number 
   return { start, end }
 }
 
+function parseHeadingAnchor(oh: string | undefined): { verse: number; segment: number } | undefined {
+  if (!oh) return undefined
+  const m = oh.match(/^(\d+)(?:\.(\d+))?$/)
+  if (!m) return undefined
+  return { verse: Number(m[1]), segment: m[2] ? Number(m[2]) : 0 }
+}
+
 function ChapterPage() {
   const { bookNo, chapterNo } = Route.useParams()
-  const { hl } = Route.useSearch()
+  const { hl, oh } = Route.useSearch()
   const { book } = Route.useLoaderData()
 
-  const prevCh = chapterNo > 1 ? chapterNo - 1 : null
-  const nextCh = chapterNo < book.chapterCount ? chapterNo + 1 : null
+  // Chapter 1's previous page is the book outline (which sits before chapter 1).
+  const prev: NavTarget =
+    chapterNo > 1
+      ? { kind: 'chapter', bookNo, chapterNo: chapterNo - 1 }
+      : { kind: 'outline', bookNo }
+  const next: NavTarget =
+    chapterNo < book.chapterCount ? { kind: 'chapter', bookNo, chapterNo: chapterNo + 1 } : null
   const { start, end } = parseHighlight(hl)
+  const headingAnchor = parseHeadingAnchor(oh)
 
   return (
     <ChapterView
@@ -74,13 +101,14 @@ function ChapterPage() {
       chapterNo={chapterNo}
       highlightStart={start}
       highlightEnd={end}
+      headingAnchor={headingAnchor}
       leftAction={
-        <ArrowLink target={prevCh ? { bookNo, chapterNo: prevCh } : null}>
+        <ArrowLink target={prev}>
           <ChevronLeft className="size-4" />
         </ArrowLink>
       }
       rightAction={
-        <ArrowLink target={nextCh ? { bookNo, chapterNo: nextCh } : null}>
+        <ArrowLink target={next}>
           <ChevronRight className="size-4" />
         </ArrowLink>
       }
