@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
-import { Link, Outlet, createRootRoute, useLocation } from '@tanstack/react-router'
+import { Link, Outlet, createRootRoute, useLocation, useNavigate } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-import { BookOpen, Moon, Search, Settings, Sun } from 'lucide-react'
+import { BookOpen, ClipboardList, Moon, Search, Settings, Sun } from 'lucide-react'
 import { CANON, BOOK_BY_NO, type CanonBook } from '@/data/canon'
 import { BOOK_ABBREV } from '@/data/abbrev'
 import { LookupPanel } from '@/components/LookupPanel'
@@ -18,7 +18,7 @@ export const Route = createRootRoute({
   component: RootComponent,
 })
 
-type SidebarMode = 'catalog' | 'lookup' | 'settings'
+type SidebarMode = 'catalog' | 'lookup' | 'compose' | 'settings'
 type Theme = 'light' | 'dark'
 
 function RootComponent() {
@@ -36,6 +36,8 @@ function RootComponent() {
       : 'light',
   )
   const [showOutline, setShowOutline] = useLocalStorage('open-verse/show-outline', true)
+  const [composeInput, setComposeInput] = useLocalStorage('open-verse/compose-input', '')
+  const navigate = useNavigate()
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -54,6 +56,16 @@ function RootComponent() {
           <Search className="size-4" />
         </NavButton>
         <NavButton
+          active={mode === 'compose'}
+          label="綱要"
+          onClick={() => {
+            setMode('compose')
+            navigate({ to: '/compose' })
+          }}
+        >
+          <ClipboardList className="size-4" />
+        </NavButton>
+        <NavButton
           active={mode === 'settings'}
           label="設定"
           onClick={() => setMode('settings')}
@@ -66,6 +78,16 @@ function RootComponent() {
       {mode === 'lookup' ? (
         <aside className="w-[426px] shrink-0 overflow-hidden border-r border-border bg-card">
           <LookupPanel />
+        </aside>
+      ) : mode === 'compose' ? (
+        <aside className="flex w-[426px] shrink-0 flex-col border-r border-border bg-card">
+          <StickyHeader>綱要</StickyHeader>
+          <textarea
+            value={composeInput}
+            onChange={(e) => setComposeInput(e.target.value)}
+            placeholder="貼上綱要，右邊會列出每個點下面的經文…"
+            className="flex-1 resize-none bg-transparent p-4 font-serif text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+          />
         </aside>
       ) : mode === 'settings' ? (
         <aside className="flex w-[213px] shrink-0 flex-col border-r border-border bg-card">
