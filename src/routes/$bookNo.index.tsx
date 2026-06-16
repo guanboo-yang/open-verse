@@ -2,7 +2,7 @@ import { createFileRoute, notFound, Link } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { BOOK_BY_NO } from '@/data/canon'
 import { useOutline } from '@/data/loadBible'
-import { formatOutlineRange } from '@/lib/chinese'
+import { formatOutlineRange, displayMarker } from '@/lib/chinese'
 
 export const Route = createFileRoute('/$bookNo/')({
   parseParams: (raw) => ({ bookNo: Number(raw.bookNo) }),
@@ -47,7 +47,7 @@ function BookOutlinePage() {
       </header>
 
       <article className="mx-auto max-w-3xl px-8 py-8">
-        <div className="flex flex-col font-sans text-sm">
+        <div className="flex flex-col gap-y-2.5 font-sans text-sm">
           {entries.map((e, i) => (
             <Link
               key={i}
@@ -58,15 +58,17 @@ function BookOutlinePage() {
                   ? { oh: `${e.anchor.verse}${e.anchor.segment ? `.${e.anchor.segment}` : ''}` }
                   : {}
               }
-              style={{ paddingLeft: `${(e.level - 1) * 0.75 + 0.5}rem` }}
-              className="rounded py-1 pr-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              style={{ paddingLeft: `${(e.level - 1) * 0.5}rem` }}
+              className="group block pr-2 text-muted-foreground transition-colors hover:text-foreground"
             >
-              {e.marker && <span className="mr-1.5">{e.marker}</span>}
-              {e.title}
-              {e.continued && ' (續)'}
-              {e.range && (
-                <span className="ml-1.5 text-muted-foreground/60">{formatOutlineRange(e.range)}</span>
-              )}
+              <span className="inline-block rounded px-1 -mx-1 transition-colors group-hover:bg-muted">
+                {e.marker && <span className="mr-1.5">{displayMarker(e.marker)}</span>}
+                {e.title}
+                {e.continued && ' (續)'}
+                {e.range && (
+                  <span className="ml-1.5 text-muted-foreground/60">{formatOutlineRange(e.range)}</span>
+                )}
+              </span>
             </Link>
           ))}
         </div>

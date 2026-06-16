@@ -32,6 +32,11 @@ export function chapterUnit(bookNo: number): string {
   return bookNo === 19 ? '篇' : '章'
 }
 
+/** Display an outline marker with half-width parens — only L5 （四）/ L6 （1） have any. */
+export function displayMarker(marker: string): string {
+  return marker.replace(/（/g, '(').replace(/）/g, ')')
+}
+
 /**
  * Chapter numeral as used in Bible outline ranges: 11–19 keep 十 (十三), round
  * tens keep 十 (二十、五十), but 21–99 drop it (二五 = 25, 三七 = 37). 100+ falls

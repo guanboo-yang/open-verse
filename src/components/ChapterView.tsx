@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useBible, useOutline, findChapter, chapterOutlineByAnchor } from '@/data/loadBible'
 import { BOOK_BY_NO } from '@/data/canon'
-import { toChineseNumber, chapterUnit, formatOutlineRange } from '@/lib/chinese'
+import { toChineseNumber, chapterUnit, formatOutlineRange, displayMarker } from '@/lib/chinese'
 import { useLocalStorage } from '@/lib/useLocalStorage'
 import type { Mark, OutlineEntry } from '@/types/bible'
 
@@ -61,7 +61,7 @@ function OutlineHeading({
   // room and the margins are pulled in by 0.25rem to compensate (no layout shift).
   const indent = (entry.level - 1) * 0.5
   const cls =
-    'col-start-2 flex gap-1.5 font-sans text-sm text-muted-foreground ' +
+    'col-start-2 justify-self-start flex gap-1.5 font-sans text-sm text-muted-foreground ' +
     (tight ? '' : 'mt-2 first:mt-0 ') +
     (highlight ? 'rounded bg-yellow-400/25 px-1' : '')
   const style = highlight
@@ -70,7 +70,7 @@ function OutlineHeading({
 
   return (
     <div ref={innerRef} className={cls} style={style}>
-      {entry.marker && <span className="shrink-0">{entry.marker}</span>}
+      {entry.marker && <span className="shrink-0">{displayMarker(entry.marker)}</span>}
       <span>
         {entry.title}
         {entry.continued && ' (續)'}
