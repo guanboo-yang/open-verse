@@ -3,6 +3,7 @@ import { useBible, useOutline, findChapter, chapterOutlineByAnchor } from '@/dat
 import { BOOK_BY_NO } from '@/data/canon'
 import { toChineseNumber, chapterUnit, formatOutlineRange, displayMarker } from '@/lib/chinese'
 import { useLocalStorage } from '@/lib/useLocalStorage'
+import { cn } from '@/lib/utils'
 import type { Mark, OutlineEntry } from '@/types/bible'
 
 // 人名 / 地名 單底線、補字 點底線（音譯 tl 不標）；線用淡色
@@ -237,7 +238,7 @@ export function ChapterView({
                 >
                   {r.num}
                 </span>
-                <p className={r.hl ? 'rounded bg-yellow-400/25 px-1 -mx-1' : undefined}>
+                <p className={cn('font-medium', r.hl && 'rounded bg-yellow-400/25 px-1 -mx-1')}>
                   {renderMarkedText(r.text, r.marks)}
                 </p>
               </Fragment>

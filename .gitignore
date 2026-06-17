@@ -1,5 +1,4 @@
 # Secrets / env
-.envrc
 .env
 .env.*
 
