@@ -90,16 +90,21 @@ function parseRefList(s: string, ctx: Ctx): VerseRef[] {
     }
 
     if (ctx.book == null || ctx.chapter == null) continue
+    // Capture the narrowed values locally — mutating ctx.chapter at the bottom
+    // of the loop would otherwise widen it back to `number | null` for the next
+    // iteration and break TS narrowing (tsc -b catches this; tsc --noEmit doesn't).
+    const book = ctx.book
+    let chapter = ctx.chapter
     for (let vspec of token.split(/[、]/)) {
       vspec = vspec.trim().replace(/節$/, '')
       if (!vspec) continue
       const m = vspec.match(VERSE_RE)
       if (!m) continue
       const isRange = m[4] != null
-      const endChapter = m[3] ? (cnToNum(m[3]) ?? ctx.chapter) : ctx.chapter
+      const endChapter: number = m[3] ? (cnToNum(m[3]) ?? chapter) : chapter
       refs.push({
-        bookNo: ctx.book,
-        chapter: ctx.chapter,
+        bookNo: book,
+        chapter,
         verseStart: Number(m[1]),
         endChapter,
         verseEnd: isRange ? Number(m[4]) : Number(m[1]),
@@ -108,8 +113,9 @@ function parseRefList(s: string, ctx: Ctx): VerseRef[] {
       })
       // A later chapter-less ref continues from this range's end chapter
       // (公義 五11 → 聖別 12 means 5:12, not 3:12).
-      ctx.chapter = endChapter
+      chapter = endChapter
     }
+    ctx.chapter = chapter
   }
   return refs
 }
