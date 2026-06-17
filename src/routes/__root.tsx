@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Outlet, createRootRoute, useLocation, useNavigate } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-import { BookOpen, ClipboardList, Moon, Search, Settings, Sun } from 'lucide-react'
+import { BookOpen, ChevronDown, ClipboardList, Monitor, Moon, Search, Settings, Sun } from 'lucide-react'
 import { CANON, BOOK_BY_NO, type CanonBook } from '@/data/canon'
 import { BOOK_ABBREV } from '@/data/abbrev'
 import { LookupPanel } from '@/components/LookupPanel'
@@ -19,7 +19,7 @@ export const Route = createRootRoute({
 })
 
 type SidebarMode = 'catalog' | 'lookup' | 'compose' | 'settings'
-type Theme = 'light' | 'dark'
+type Theme = 'light' | 'dark' | 'system'
 
 function RootComponent() {
   const { pathname } = useLocation()
@@ -29,21 +29,51 @@ function RootComponent() {
   const activeBook = activeBookNo ? BOOK_BY_NO.get(activeBookNo) ?? null : null
 
   const [mode, setMode] = useLocalStorage<SidebarMode>('open-verse/sidebar-mode', 'catalog')
-  const [theme, setTheme] = useLocalStorage<Theme>(
-    'open-verse/theme',
-    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light',
-  )
+  const [theme, setTheme] = useLocalStorage<Theme>('open-verse/theme', 'system')
   const [showOutline, setShowOutline] = useLocalStorage('open-verse/show-outline', true)
   const [composeInput, setComposeInput] = useLocalStorage('open-verse/compose-input', '')
   const navigate = useNavigate()
 
+  // Apply the theme; 'system' tracks the OS preference live via the media query.
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
+    const root = document.documentElement
+    if (theme !== 'system') {
+      root.classList.toggle('dark', theme === 'dark')
+      return
+    }
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const apply = () => root.classList.toggle('dark', mq.matches)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
   }, [theme])
   const otBooks = CANON.filter((b) => b.testament === 'OT')
   const ntBooks = CANON.filter((b) => b.testament === 'NT')
+
+  // Catalog accordion — 舊約 and 新約 can both be open, but 章節 is mutually
+  // exclusive with the book lists. Auto-switches to 章節 when a book becomes
+  // active (e.g. user picked one from the list).
+  type CatalogSection = 'OT' | 'NT' | 'chapters'
+  const [openSections, setOpenSections] = useState<Set<CatalogSection>>(() =>
+    activeBook ? new Set(['chapters']) : new Set(['OT', 'NT']),
+  )
+  useEffect(() => {
+    if (activeBookNo != null) setOpenSections(new Set(['chapters']))
+  }, [activeBookNo])
+  // Valid states are exactly: {chapters} | {OT, NT} | {OT} | {NT}.
+  // The book lists and the chapter grid are mutually exclusive, and at least
+  // one section is always open (clicking the sole-open OT or NT is a no-op).
+  const toggleSection = (s: CatalogSection) =>
+    setOpenSections((prev) => {
+      if (s === 'chapters') {
+        return prev.has('chapters') ? new Set(['OT', 'NT']) : new Set(['chapters'])
+      }
+      if (prev.has('chapters')) return new Set([s])
+      if (prev.has(s)) return prev.size > 1 ? new Set([s === 'OT' ? 'NT' : 'OT']) : prev
+      const next = new Set(prev)
+      next.add(s)
+      return next
+    })
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
@@ -93,10 +123,11 @@ function RootComponent() {
         <aside className="flex w-[213px] shrink-0 flex-col border-r border-border bg-card">
           <StickyHeader>設定</StickyHeader>
           <div className="flex flex-col divide-y divide-border">
-            <SettingRow label="主題">
-              <div className="flex gap-1 rounded-md bg-muted p-0.5">
-                <ThemeButton active={theme === 'light'} onClick={() => setTheme('light')} icon={Sun} label="淺" />
-                <ThemeButton active={theme === 'dark'} onClick={() => setTheme('dark')} icon={Moon} label="深" />
+            <SettingRow label="主題" stack>
+              <div className="flex gap-1 rounded-lg bg-muted p-0.5">
+                <ThemeButton active={theme === 'light'} onClick={() => setTheme('light')} icon={Sun} label="淺色" />
+                <ThemeButton active={theme === 'dark'} onClick={() => setTheme('dark')} icon={Moon} label="深色" />
+                <ThemeButton active={theme === 'system'} onClick={() => setTheme('system')} icon={Monitor} label="系統" />
               </div>
             </SettingRow>
             <SettingRow label="顯示綱目">
@@ -106,13 +137,28 @@ function RootComponent() {
         </aside>
       ) : (
         <aside className="w-[213px] shrink-0 overflow-y-auto border-r border-border bg-card">
-          <StickyHeader>舊約</StickyHeader>
-          <BookSection books={otBooks} activeBookNo={activeBookNo} />
-          <StickyHeader>新約</StickyHeader>
-          <BookSection books={ntBooks} activeBookNo={activeBookNo} />
+          <AccordionHeader
+            label="舊約"
+            open={openSections.has('OT')}
+            onClick={() => toggleSection('OT')}
+          />
+          {openSections.has('OT') && <BookSection books={otBooks} activeBookNo={activeBookNo} />}
+          <AccordionHeader
+            label="新約"
+            open={openSections.has('NT')}
+            onClick={() => toggleSection('NT')}
+            topBorder
+          />
+          {openSections.has('NT') && <BookSection books={ntBooks} activeBookNo={activeBookNo} />}
           {activeBook && (
             <>
-              <StickyHeader>{activeBook.name}</StickyHeader>
+              <AccordionHeader
+                label={activeBook.name}
+                open={openSections.has('chapters')}
+                onClick={() => toggleSection('chapters')}
+                topBorder
+              />
+              {openSections.has('chapters') && (
               <div className="grid grid-cols-5 gap-1 p-2">
                 {Array.from({ length: activeBook.chapterCount }, (_, i) => i + 1).map((ch) => (
                   <Link
@@ -131,6 +177,7 @@ function RootComponent() {
                   </Link>
                 ))}
               </div>
+              )}
             </>
           )}
         </aside>
@@ -178,9 +225,23 @@ function NavButton({
   )
 }
 
-function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+function SettingRow({
+  label,
+  children,
+  stack,
+}: {
+  label: string
+  children: React.ReactNode
+  /** Stack label above children (for wider controls like the theme picker). */
+  stack?: boolean
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3">
+    <div
+      className={cn(
+        'gap-3 px-4 py-3',
+        stack ? 'flex flex-col items-stretch' : 'flex items-center justify-between',
+      )}
+    >
       <span className="text-sm text-foreground">{label}</span>
       {children}
     </div>
@@ -203,14 +264,15 @@ function ThemeButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors',
+        'flex flex-auto items-center justify-center gap-1 rounded-md px-2 py-1 text-xs transition-colors',
         active
           ? 'bg-card text-foreground shadow-sm'
           : 'text-muted-foreground hover:text-foreground',
       )}
+      aria-label={label}
     >
       <Icon className="size-3.5" />
-      {label}
+      {active && label}
     </button>
   )
 }
@@ -231,6 +293,37 @@ function Switch({ on, onChange }: { on: boolean; onChange: () => void }) {
         className={cn(
           'inline-block size-4 rounded-full bg-card shadow transition-transform',
           on ? 'translate-x-4.5' : 'translate-x-0.5',
+        )}
+      />
+    </button>
+  )
+}
+
+function AccordionHeader({
+  label,
+  open,
+  onClick,
+  topBorder,
+}: {
+  label: string
+  open: boolean
+  onClick: () => void
+  topBorder?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'sticky top-0 z-10 flex h-8 w-full items-center justify-between border-b border-border bg-muted/80 px-4 text-xs font-semibold backdrop-blur transition-colors hover:bg-muted',
+        topBorder && 'border-t',
+      )}
+    >
+      <span>{label}</span>
+      <ChevronDown
+        className={cn(
+          'size-3.5 shrink-0 text-muted-foreground transition-transform',
+          open && 'rotate-180',
         )}
       />
     </button>
